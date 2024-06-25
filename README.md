@@ -14,11 +14,13 @@ source env/bin/activate
 4. Install Apache Beam SDK
    pip3 install apache-beam[gcp]
 
-5. Upload the python script and run the pipeline in the cloudshell python dataflow_sql.py
---project=techlanders-internal
---temp_location=gs://sandeep-apache/temp
---input=gs://sandeep-apache/input.csv
---output=techlanders-internal.dataset_demo.output-sql
---region us-east1
---zone=us-east1-b
+5. Upload the python script and run the pipeline in the cloudshell
+   python dataflow_sql.py
+--project=techlanders-internal /
+--temp_location=gs://sandeep-apache/temp /
+--input=gs://sandeep-apache/input.csv /
+--output=gs://sandeep-apache/output /
+--bq_table=techlanders-internal.dataset_demo.output-sql /
+--region us-east1 /
+--zone=us-east1-b /
 --runner=DataflowRunner
