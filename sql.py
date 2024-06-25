@@ -8,12 +8,13 @@ from apache_beam.io import ReadFromText, WriteToText
 from apache_beam.transforms.sql import SqlTransform
 from apache_beam.runners.portability import portable_runner
 from apache_beam import coders
+from apache_beam.io.gcp.bigquery import WriteToBigQuery
 
 # Define a NamedTuple for SQL transformation
 MyRow = typing.NamedTuple('MyRow', [('date', str), ('product', str), ('sales', int), ('price', float)])
 coders.registry.register_coder(MyRow, coders.RowCoder)
 
-def run(p, input_file, output_file):
+def run(p, input_file, output_file, bq_table):
     # Read from CSV and parse to MyRow NamedTuple
     sales_data = (
         p
@@ -39,9 +40,20 @@ def run(p, input_file, output_file):
     # Format SQL results and write to output file
     formatted_data = (
         transformed_data
-        | 'FormatOutput' >> beam.Map(lambda row: '{}: {}'.format(row.product, row.total_sales))
-        | 'WriteToText' >> WriteToText(output_file)
+        | 'FormatOutput' >> beam.Map(lambda row: {'product': row.product, 'total_sales': row.total_sales})
     )
+
+    # Write to BigQuery
+    formatted_data | 'WriteToBigQuery' >> WriteToBigQuery(
+        table=bq_table,
+        schema='product:STRING,total_sales:FLOAT',
+        write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+        create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
+    )
+
+    # Write to local text file (optional)
+    formatted_data | 'WriteToText' >> WriteToText(output_file)
+
 
 def main():
     logging.getLogger().setLevel(logging.INFO)
@@ -54,6 +66,10 @@ def main():
                         dest='output',
                         required=True,
                         help='Output file location')
+    parser.add_argument('--bq_table',
+                        dest='bq_table',
+                        required=True,
+                        help='BigQuery table to write results to (PROJECT_ID:DATASET.TABLE_NAME)')
 
     known_args, pipeline_args = parser.parse_known_args()
 
@@ -65,7 +81,7 @@ def main():
             # Preemptively start due to BEAM-6666.
             p.runner.create_job_service(pipeline_options)
 
-        run(p, known_args.input, known_args.output)
+        run(p, known_args.input, known_args.output, known_args.bq_table)
 
 if __name__ == '__main__':
     main()
